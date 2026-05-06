@@ -9,7 +9,7 @@ synthetiques de type entreprise : ventes, produits, regions, satisfaction client
 import numpy as np
 import pandas as pd
 import matplotlib
-matplotlib.use("Agg")
+# matplotlib.use("Agg")  # desactive pour affichage fenetre
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from matplotlib.patches import FancyBboxPatch

@@ -1,64 +1,67 @@
-# Dashboard Analytique - KPIs Business
+# 📊 Dashboard Analytique — KPIs Business
 
-Dashboard de reporting analytique complet genere en Python avec matplotlib.
-Simule un tableau de bord business pour un portefeuille de produits financiers.
+Dashboard de reporting analytique complet généré en Python avec matplotlib. Simule un tableau de bord business pour un portefeuille de produits financiers (CA, marges, NPS, satisfaction client).
 
-## Fonctionnalites
+## 📸 Aperçu
 
-- 4 KPI cards : CA total, taux de marge, NPS, top produit
-- Courbe CA mensuel vs budget
-- Pie chart de repartition CA par produit
-- Evolution NPS avec cible
-- Analyse marge mensuelle
-- Funnel de conversion commerciale
-- Scatter CA vs satisfaction client par region
+![Dashboard KPIs](docs/screenshot_dashboard.png)
+
+## 🎯 Fonctionnalités
+
+- **4 KPI cards** : CA total, taux de marge, NPS moyen, top produit
+- **Courbe CA mensuel vs budget** avec visualisation des écarts
+- **Pie chart** de répartition CA par produit
+- **Évolution NPS** avec cible sur 12 mois
+- **Analyse marge mensuelle** superposée au CA
+- **Funnel de conversion** commerciale (Leads → Clients signés)
+- **Scatter CA vs satisfaction** par région
 - Export automatique CSV + JSON
 
-## Structure
+## 📈 KPIs générés
+
+| Indicateur | Valeur |
+|------------|--------|
+| CA Annuel | 164,6 M EUR |
+| Écart budget | **+5,6%** |
+| Marge nette | **39,9%** |
+| NPS moyen | 46,6 / 100 |
+| Top produit | Assurance Vie |
+| Meilleur mois | Décembre |
+
+## 🗂️ Structure
 
 ```
 dashboard-analytique/
-├── dashboard.py         # Script principal
+├── dashboard.py           # Script principal
 ├── data/
-│   ├── kpis_mensuel.csv
-│   ├── kpis_produit.csv
-│   ├── kpis_region.csv
-│   └── synthese_kpis.json
+│   ├── kpis_mensuel.csv   # Données mensuelles
+│   ├── kpis_produit.csv   # Données par produit
+│   ├── kpis_region.csv    # Données par région
+│   └── synthese_kpis.json # Synthèse JSON
+├── docs/
+│   └── screenshot_dashboard.png
 ├── requirements.txt
 └── README.md
 ```
 
-## Installation
+## ⚙️ Installation
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Utilisation
+## 🚀 Utilisation
 
 ```bash
 python dashboard.py
 ```
 
-Genere `dashboard_kpis.png` (8 graphiques en un seul rapport) + fichiers CSV/JSON.
+Génère `dashboard_kpis.png` (8 graphiques) + exports CSV/JSON dans `data/`.
 
-## Exemple de KPIs produits
+## 🛠️ Technologies
 
-| KPI | Valeur |
-|-----|--------|
-| CA Annuel | 164,6 M EUR |
-| Ecart budget | +5.6% |
-| Marge nette | 39.9% |
-| NPS moyen | 46.6 / 100 |
+**Python 3** · **matplotlib** · **pandas** · **numpy** · **json**
 
-## Technologies
+## 👩‍💻 Auteure
 
-- Python 3.x
-- matplotlib (visualisations)
-- pandas / numpy (agregations)
-- json (export)
-
-## Auteure
-
-Vanelle Stephanie MANGOUA DJOUSSEU
-Etudiante en IA & Systemes Embarques - Recherche d'alternance
+**Vanelle Stéphanie MANGOUA DJOUSSEU** — Recherche d'alternance en IA & Systèmes Embarqués

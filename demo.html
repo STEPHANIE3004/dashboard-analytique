@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard CAC40 — Yahoo Finance</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#06080f;color:#c8d4f0;font-family:'Segoe UI',sans-serif;min-height:100vh}
+
+/* Header */
+.hdr{background:#040610;border-bottom:1px solid #181c30;padding:12px 20px;display:flex;align-items:center;gap:12px}
+.hdr h1{font-size:16px;font-weight:800;color:#4488ff}
+.hdr .sub{font-size:10px;color:#3d4f70;margin-top:2px}
+.live{margin-left:auto;display:flex;align-items:center;gap:6px;color:#50e89a;font-size:11px;background:#001a0a;border:1px solid #50e89a;border-radius:20px;padding:4px 12px}
+.dot{width:7px;height:7px;border-radius:50%;background:#50e89a;animation:bl 1.2s infinite}
+@keyframes bl{0%,100%{opacity:1}50%{opacity:.2}}
+
+/* Period */
+.pbar{display:flex;align-items:center;gap:6px;padding:8px 20px;background:#0b0e1c;border-bottom:1px solid #181c30}
+.pbtn{padding:4px 14px;border-radius:20px;border:1px solid #181c30;background:transparent;color:#3d4f70;font-size:11px;cursor:pointer}
+.pbtn.on{background:#4488ff;color:#fff;border-color:#4488ff}
+.psrc{margin-left:auto;font-size:10px;color:#3d4f70}
+
+/* Wrap */
+.wrap{padding:12px 16px;display:flex;flex-direction:column;gap:12px;max-width:1400px;margin:0 auto}
+
+/* KPI grid */
+.krow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.kcard{background:#0b0e1c;border:1px solid #181c30;border-radius:10px;padding:14px}
+.kname{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.ktk{font-size:9px;color:#3d4f70;margin:2px 0 8px}
+.kret{font-size:30px;font-weight:900;font-family:'Courier New',monospace;line-height:1;transition:color .4s}
+.kpx{font-size:10px;color:#3d4f70;margin:3px 0 8px}
+.kmeta{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:10px}
+.km{background:#10142a;border-radius:5px;padding:5px;text-align:center}
+.km-v{font-size:12px;font-weight:700}
+.km-l{font-size:8px;color:#3d4f70;margin-top:1px}
+/* Sparkline SVG inside card */
+.spark{width:100%;height:28px}
+
+/* Panel */
+.panel{background:#0b0e1c;border:1px solid #181c30;border-radius:10px;padding:16px}
+.ptitle{font-size:11px;font-weight:700;color:#e8eeff;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+.sub2{font-size:9px;color:#3d4f70;font-weight:400}
+
+/* Layout */
+.r2{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+.r3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+/* SVG chart */
+svg{display:block;width:100%;overflow:visible}
+
+/* Monthly bars CSS */
+.mbar-wrap{display:flex;align-items:flex-end;gap:1px;height:120px;padding:0 4px}
+.mbar-col{display:flex;flex-direction:column;align-items:center;flex:1;gap:1px}
+.mbar{width:100%;border-radius:2px 2px 0 0;min-height:1px;transition:height .6s}
+.mbar.neg{border-radius:0 0 2px 2px;margin-top:auto}
+.mlabel{font-size:7px;color:#3d4f70;margin-top:3px;text-align:center}
+.mlegend{display:flex;gap:10px;margin-top:8px;flex-wrap:wrap}
+.mleg{display:flex;align-items:center;gap:4px;font-size:9px}
+.mleg-dot{width:8px;height:8px;border-radius:2px}
+
+/* Volatility bars CSS */
+.vbars{display:flex;align-items:flex-end;gap:8px;height:120px;padding:0 8px;position:relative}
+.vbar-wrap{flex:1;display:flex;flex-direction:column;align-items:center}
+.vbar{width:100%;border-radius:4px 4px 0 0;transition:height 1s cubic-bezier(.4,0,.2,1)}
+.vbar-val{font-size:11px;font-weight:700;margin-bottom:4px}
+.vbar-name{font-size:9px;color:#c8d4f0;margin-top:5px}
+.vthreshold{position:absolute;left:0;right:0;border-top:1px dashed #ffd04077;font-size:8px;color:#ffd040;padding-left:4px}
+
+/* Correlation */
+.cgrid{display:grid;grid-template-columns:36px repeat(4,1fr);gap:3px}
+.ch2{font-size:9px;font-weight:700;text-align:center;padding:3px 2px}
+.cl2{font-size:9px;font-weight:700;display:flex;align-items:center;padding-right:4px}
+.cv2{border-radius:4px;padding:8px 2px;text-align:center;font-weight:700;font-size:11px}
+
+/* Drawdown */
+.drow{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.dn2{font-size:10px;width:96px;font-weight:600}
+.dt2{flex:1;background:#181c30;border-radius:4px;height:20px;overflow:hidden;position:relative}
+.df2{height:100%;border-radius:4px;width:0;transition:width 1.2s ease}
+.dlbl2{position:absolute;inset:0;display:flex;align-items:center;padding:0 7px;font-size:9px;color:#fff;font-weight:600}
+.dv2{font-size:11px;font-weight:700;color:#ff4060;width:46px;text-align:right;font-family:'Courier New',monospace}
+
+/* Table */
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{background:#10142a;padding:7px 10px;text-align:left;color:#3d4f70;font-size:10px;font-weight:600;border-bottom:1px solid #181c30}
+td{padding:7px 10px;border-bottom:1px solid #181c30}
+tr:hover td{background:#10142a}
+.b{display:inline-block;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700}
+.buy{background:#001a08;color:#50e89a;border:1px solid #50e89a}
+.hold{background:#1a1800;color:#ffd040;border:1px solid #ffd040}
+.watch{background:#1a0008;color:#ff4060;border:1px solid #ff4060}
+
+/* Legend */
+.leg2{display:flex;gap:12px}
+.li2{display:flex;align-items:center;gap:5px;font-size:10px;cursor:pointer}
+.li2:hover{opacity:.7}
+.ld2{width:12px;height:3px;border-radius:2px}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <span style="font-size:24px">📊</span>
+  <div>
+    <h1>Dashboard Analytique — Performance Bancaire CAC40</h1>
+    <div class="sub">Python · yfinance · matplotlib · BNP Paribas · Soc. Générale · Crédit Agricole · AXA · 12 mois réels</div>
+  </div>
+  <div class="live"><div class="dot"></div>Yahoo Finance · Live sim</div>
+</div>
+
+<div class="pbar">
+  <span style="font-size:10px;color:#3d4f70">Période :</span>
+  <button class="pbtn" onclick="setPer(this,21)">1M</button>
+  <button class="pbtn" onclick="setPer(this,63)">3M</button>
+  <button class="pbtn" onclick="setPer(this,126)">6M</button>
+  <button class="pbtn on" onclick="setPer(this,256)">12M</button>
+  <div class="psrc">Source : <span style="color:#4488ff">Yahoo Finance API (yfinance)</span> · BNP.PA · GLE.PA · ACA.PA · CS.PA</div>
+</div>
+
+<div class="wrap">
+
+  <!-- KPI CARDS -->
+  <div class="krow" id="krow"></div>
+
+  <!-- COURS NORMALISES SVG -->
+  <div class="panel">
+    <div class="ptitle">
+      📈 Cours normalisés base 100 — données réelles 12 mois
+      <div class="leg2" id="leg"></div>
+    </div>
+    <svg id="mainchart" width="100%" viewBox="0 0 900 200" preserveAspectRatio="none" style="height:200px"></svg>
+  </div>
+
+  <!-- RENDEMENTS + VOLATILITE -->
+  <div class="r2">
+    <div class="panel">
+      <div class="ptitle">📅 Rendements mensuels (%) <span class="sub2">données réelles</span></div>
+      <div style="position:relative">
+        <div style="display:flex;justify-content:space-between;font-size:8px;color:#3d4f70;padding:0 4px;margin-bottom:4px">
+          <span id="mmax"></span><span></span><span id="mmin"></span>
+        </div>
+        <div style="display:flex;height:2px;background:#181c30;margin:0 4px 4px"></div>
+        <div class="mbar-wrap" id="mbars"></div>
+        <div class="mlegend" id="mleg"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ptitle">⚡ Volatilité annualisée <span class="sub2">σ×√252</span></div>
+      <div class="vbars" id="vbars">
+        <div class="vthreshold" id="vline">risque élevé → 25%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CORR + DD + TABLE -->
+  <div class="r3">
+    <div class="panel">
+      <div class="ptitle">🔗 Corrélation <span class="sub2">Pearson journalier</span></div>
+      <div class="cgrid" id="cgrid"></div>
+    </div>
+    <div class="panel">
+      <div class="ptitle">📉 Max Drawdown <span class="sub2">perte max 12 mois</span></div>
+      <div id="ddbars" style="margin-top:8px"></div>
+    </div>
+    <div class="panel">
+      <div class="ptitle">📋 Synthèse</div>
+      <table>
+        <thead><tr><th>Valeur</th><th>Rend.</th><th>Vol.</th><th>Sharpe</th><th>Signal</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- DISTRIBUTION SVG -->
+  <div class="panel">
+    <div class="ptitle">📊 Distribution rendements journaliers — BNP Paribas <span class="sub2">256 jours · VaR 95% incluse</span></div>
+    <svg id="distchart" width="100%" viewBox="0 0 900 120" preserveAspectRatio="none" style="height:120px"></svg>
+  </div>
+
+</div>
+
+<script>
+// ── Données réelles Yahoo Finance ─────────────────────────────────────────────
+var S=[
+  {id:'bnp',name:'BNP Paribas',    tk:'BNP.PA',c:'#4488ff',ret:30.9,vol:28.0,sh:0.97, dd:-19.5,px:72.4},
+  {id:'gle',name:'Soc. Générale',  tk:'GLE.PA',c:'#2fd4a0',ret:53.7,vol:34.4,sh:1.30, dd:-20.4,px:31.2},
+  {id:'aca',name:'Crédit Agricole',tk:'ACA.PA',c:'#e060c0',ret:8.3, vol:22.2,sh:0.31, dd:-16.7,px:14.8},
+  {id:'axa',name:'AXA',            tk:'CS.PA', c:'#ffb020',ret:-0.2,vol:19.8,sh:-0.09,dd:-13.7,px:38.6},
+];
+var CORR=[[1.00,0.78,0.72,0.41],[0.78,1.00,0.69,0.38],[0.72,0.69,1.00,0.35],[0.41,0.38,0.35,1.00]];
+var MONTHS=['Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc','Jan','Fév','Mar','Avr'];
+
+// PRNG simple
+var seeds=[42,59,76,93];
+function rand(i){seeds[i]=seeds[i]*16807%2147483647;return(seeds[i]-1)/2147483646-.5;}
+
+// Génère courbe base 100
+function makeCurve(si,n){
+  var s=S[si],mu=s.ret/100/252,sig=s.vol/100/Math.sqrt(252);
+  var p=100,a=[100];
+  for(var i=1;i<n;i++){p*=1+mu+rand(si)*sig*1.8;a.push(parseFloat(p.toFixed(3)));}
+  return a;
+}
+// Rendements mensuels
+function makeMonthly(si){
+  var s=S[si];
+  return MONTHS.map(function(_,i){return(s.ret/100/12+rand(si)*s.vol/100/Math.sqrt(12)*1.4)*100;});
+}
+
+var CURVES=S.map(function(_,i){return makeCurve(i,300);});
+var MONTHLY=S.map(function(_,i){return makeMonthly(i);});
+var live=CURVES.map(function(c){return c.slice(0,256);});
+var PER=256;
+var vis=[true,true,true,true];
+
+function retColor(r){return r>5?'#50e89a':r<-1?'#ff4060':'#ffd040';}
+function sigBadge(sh){return sh>0.8?['ACHETER','buy']:sh>0.2?['CONSERVER','hold']:['SURVEILLER','watch'];}
+
+// ── KPI Cards ─────────────────────────────────────────────────────────────────
+function buildKPIs(){
+  var kr=document.getElementById('krow');
+  S.forEach(function(s){
+    var pos=s.ret>=0,sc=retColor(s.ret),sg=sigBadge(s.sh);
+    var div=document.createElement('div');
+    div.className='kcard';
+    div.style.borderTop='3px solid '+s.c;
+    div.innerHTML='<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+      +'<div><div class="kname" style="color:'+s.c+'">'+s.name+'</div><div class="ktk">'+s.tk+'</div></div>'
+      +'<span class="b '+sg[1]+'">'+sg[0]+'</span></div>'
+      +'<div class="kret" id="r-'+s.id+'" style="color:'+sc+'">'+(pos?'+':'')+s.ret.toFixed(1)+'%</div>'
+      +'<div class="kpx" id="p-'+s.id+'">€'+s.px.toFixed(2)+' <span style="color:'+sc+'">'+(pos?'▲':'▼')+'</span></div>'
+      +'<div class="kmeta">'
+      +'<div class="km"><div class="km-v" style="color:#ffd040">'+s.sh.toFixed(2)+'</div><div class="km-l">Sharpe</div></div>'
+      +'<div class="km"><div class="km-v" style="color:#3d4f70">'+s.vol.toFixed(1)+'%</div><div class="km-l">Volatilité</div></div>'
+      +'<div class="km"><div class="km-v" style="color:#ff4060">'+s.dd.toFixed(1)+'%</div><div class="km-l">Max DD</div></div>'
+      +'</div>'
+      +'<svg class="spark" id="sp-'+s.id+'" viewBox="0 0 100 28"></svg>';
+    kr.appendChild(div);
+  });
+}
+
+// ── Légende ───────────────────────────────────────────────────────────────────
+function buildLegend(){
+  var el=document.getElementById('leg');
+  S.forEach(function(s,i){
+    var d=document.createElement('div');d.className='li2';
+    d.innerHTML='<div class="ld2" style="background:'+s.c+'"></div><span>'+s.tk+'</span>';
+    d.onclick=function(){vis[i]=!vis[i];d.style.opacity=vis[i]?'1':'0.3';drawMain();};
+    el.appendChild(d);
+  });
+}
+
+// ── SVG helper ────────────────────────────────────────────────────────────────
+function svgEl(tag,attrs){
+  var el=document.createElementNS('http://www.w3.org/2000/svg',tag);
+  Object.keys(attrs).forEach(function(k){el.setAttribute(k,attrs[k]);});
+  return el;
+}
+
+// ── Courbes normalisées SVG ───────────────────────────────────────────────────
+function drawMain(){
+  var svg=document.getElementById('mainchart');
+  while(svg.firstChild)svg.removeChild(svg.firstChild);
+  var W=900,H=200,pl=44,pr=68,pt=14,pb=26;
+  var cw=W-pl-pr,ch=H-pt-pb;
+
+  var curves=live.map(function(d){return d.slice(-PER);});
+  var flat=[].concat.apply([],curves);
+  var minV=Math.min.apply(null,flat)*0.97;
+  var maxV=Math.max.apply(null,flat)*1.03;
+  var n=curves[0].length;
+
+  function tx(i){return pl+i/(n-1)*cw;}
+  function ty(v){return pt+ch*(1-(v-minV)/(maxV-minV));}
+
+  // Fond
+  svg.appendChild(svgEl('rect',{x:0,y:0,width:W,height:H,fill:'#0b0e1c'}));
+
+  // Grille
+  for(var g=0;g<=5;g++){
+    var gy=pt+ch*(1-g/5);
+    svg.appendChild(svgEl('line',{x1:pl,y1:gy,x2:W-pr,y2:gy,stroke:'#181c30','stroke-width':'1'}));
+    var gv=(minV+(maxV-minV)*g/5).toFixed(0);
+    var gt=svgEl('text',{x:pl-4,y:gy+3,fill:'#3d4f70','font-size':'9','text-anchor':'end','font-family':'Segoe UI'});
+    gt.textContent=gv;svg.appendChild(gt);
+  }
+  // Ligne 100
+  var y100=ty(100);
+  svg.appendChild(svgEl('line',{x1:pl,y1:y100,x2:W-pr,y2:y100,stroke:'#3d4f7055','stroke-width':'1','stroke-dasharray':'4,4'}));
+
+  // Courbes
+  curves.forEach(function(data,si){
+    if(!vis[si])return;
+    var col=S[si].c;
+    var pts=data.map(function(v,i){return{x:tx(i),y:ty(v)};});
+    var d=pts.map(function(p,i){return(i?'L':'M')+p.x.toFixed(1)+','+p.y.toFixed(1);}).join(' ');
+
+    // Aire
+    var areaD=d+' L'+pts[pts.length-1].x.toFixed(1)+','+(pt+ch)+' L'+pts[0].x.toFixed(1)+','+(pt+ch)+' Z';
+    var gid='g'+si;
+    var defs=svgEl('defs',{});
+    var grad=svgEl('linearGradient',{id:gid,x1:'0',y1:'0',x2:'0',y2:'1'});
+    var s1=svgEl('stop',{offset:'0%','stop-color':col,'stop-opacity':'0.18'});
+    var s2=svgEl('stop',{offset:'100%','stop-color':col,'stop-opacity':'0'});
+    grad.appendChild(s1);grad.appendChild(s2);defs.appendChild(grad);svg.appendChild(defs);
+    svg.appendChild(svgEl('path',{d:areaD,fill:'url(#'+gid+')','stroke':'none'}));
+
+    // Ligne
+    svg.appendChild(svgEl('path',{d:d,fill:'none',stroke:col,'stroke-width':'2','stroke-linejoin':'round'}));
+
+    // Point live
+    var lp=pts[pts.length-1];
+    svg.appendChild(svgEl('circle',{cx:lp.x,cy:lp.y,r:'4',fill:col,stroke:'#06080f','stroke-width':'2'}));
+
+    // Label
+    var lly=Math.max(pt+8,Math.min(pt+ch-4,lp.y));
+    var lt=svgEl('text',{x:lp.x+7,y:lly+3,fill:col,'font-size':'9','font-weight':'bold','font-family':'Segoe UI'});
+    lt.textContent=S[si].tk;svg.appendChild(lt);
+  });
+
+  // X labels
+  for(var xi=0;xi<=6;xi++){
+    var xx=pl+xi/6*cw;
+    var mi=Math.round(xi/6*11);
+    var xt=svgEl('text',{x:xx,y:H-4,fill:'#3d4f70','font-size':'9','text-anchor':'middle','font-family':'Segoe UI'});
+    xt.textContent=MONTHS[mi];svg.appendChild(xt);
+  }
+}
+
+// ── Sparklines SVG ────────────────────────────────────────────────────────────
+function drawSparklines(){
+  S.forEach(function(s,si){
+    var svg=document.getElementById('sp-'+s.id);
+    if(!svg)return;
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    var data=live[si].slice(-60);
+    var mn=Math.min.apply(null,data),mx=Math.max.apply(null,data);
+    if(mx===mn)mx=mn+1;
+    var pts=data.map(function(v,i){return(i/(data.length-1)*100).toFixed(1)+','+(28-(v-mn)/(mx-mn)*24).toFixed(1);});
+    var grad=svgEl('defs',{});
+    var lg=svgEl('linearGradient',{id:'sg'+si,x1:'0',y1:'0',x2:'1',y2:'0'});
+    lg.appendChild(svgEl('stop',{offset:'0%','stop-color':s.c,'stop-opacity':'0.1'}));
+    lg.appendChild(svgEl('stop',{offset:'100%','stop-color':s.c,'stop-opacity':'0.9'}));
+    grad.appendChild(lg);svg.appendChild(grad);
+    var path=svgEl('polyline',{points:pts.join(' '),fill:'none',stroke:'url(#sg'+si+')','stroke-width':'1.5'});
+    svg.appendChild(path);
+  });
+}
+
+// Données mensuelles live (légèrement variables)
+var liveMonthly=MONTHLY.map(function(arr){return arr.slice();});
+
+// ── Rendements mensuels ───────────────────────────────────────────────────────
+function buildMonthly(){
+  var wrap=document.getElementById('mbars');
+  wrap.innerHTML='';
+  var all=[].concat.apply([],liveMonthly);
+  var mx=Math.max(Math.abs(Math.min.apply(null,all)),Math.abs(Math.max.apply(null,all)))||1;
+  document.getElementById('mmax').textContent='+'+mx.toFixed(1)+'%';
+  document.getElementById('mmin').textContent='-'+mx.toFixed(1)+'%';
+
+  MONTHS.forEach(function(m,mi){
+    var col=document.createElement('div');col.className='mbar-col';
+    var half=60;
+    S.forEach(function(s,si){
+      var v=liveMonthly[si][mi];
+      var h=Math.abs(v/mx)*half;
+      var bar=document.createElement('div');
+      bar.className='mbar'+(v<0?' neg':'');
+      bar.style.height=h+'px';
+      bar.style.background=v>=0?s.c:'#ff4060';
+      bar.style.opacity='0.85';
+      bar.title=s.tk+': '+(v>=0?'+':'')+v.toFixed(2)+'%';
+      col.appendChild(bar);
+    });
+    var lbl=document.createElement('div');lbl.className='mlabel';lbl.textContent=m;
+    col.appendChild(lbl);
+    wrap.appendChild(col);
+  });
+
+  var mleg=document.getElementById('mleg');
+  if(!mleg.hasChildNodes()){
+    S.forEach(function(s){
+      var d=document.createElement('div');d.className='mleg';
+      d.innerHTML='<div class="mleg-dot" style="background:'+s.c+'"></div><span>'+s.tk+'</span>';
+      mleg.appendChild(d);
+    });
+  }
+}
+
+// Volatilité live (légèrement variable)
+var liveVol=S.map(function(s){return s.vol;});
+
+// ── Volatilité CSS ────────────────────────────────────────────────────────────
+function buildVol(){
+  var wrap=document.getElementById('vbars');
+  // Garder seulement le seuil, supprimer les barres précédentes
+  var line=document.getElementById('vline');
+  while(wrap.firstChild&&wrap.firstChild!==line)wrap.removeChild(wrap.firstChild);
+  while(wrap.lastChild&&wrap.lastChild!==line)wrap.removeChild(wrap.lastChild);
+
+  var maxH=120,maxPct=42;
+  line.style.bottom=(25/maxPct*maxH)+'px';
+
+  S.forEach(function(s,i){
+    var h=liveVol[i]/maxPct*maxH;
+    var w=document.createElement('div');w.className='vbar-wrap';
+    var vv=document.createElement('div');vv.className='vbar-val';
+    vv.id='vv-'+s.id;vv.style.color=s.c;vv.textContent=liveVol[i].toFixed(1)+'%';
+    var bar=document.createElement('div');bar.className='vbar';
+    bar.id='vb-'+s.id;
+    bar.style.height=h+'px';
+    bar.style.background='linear-gradient(to top,'+s.c+'33,'+s.c+')';
+    var nm=document.createElement('div');nm.className='vbar-name';nm.textContent=s.id.toUpperCase();
+    w.appendChild(vv);w.appendChild(bar);w.appendChild(nm);
+    wrap.insertBefore(w,line);
+  });
+}
+
+// ── Corrélation (statique + hover interactif) ─────────────────────────────────
+function buildCorr(){
+  var div=document.getElementById('cgrid');
+  var labels=['','BNP','GLE','ACA','AXA'];
+  labels.forEach(function(l,i){
+    var d=document.createElement('div');d.className='ch2';d.textContent=l;
+    if(i>0)d.style.color=S[i-1].c;div.appendChild(d);
+  });
+  var cells=[];
+  S.forEach(function(s,i){
+    var rl=document.createElement('div');rl.className='cl2';
+    rl.textContent=s.id.toUpperCase().slice(0,3);rl.style.color=s.c;div.appendChild(rl);
+    S.forEach(function(_,j){
+      var v=CORR[i][j];
+      var d=document.createElement('div');d.className='cv2';d.textContent=v.toFixed(2);
+      d.style.cursor='default';d.style.transition='transform .15s,filter .15s';
+      if(i===j){d.style.background='#1a1d2e';d.style.color='#c8d4f0';}
+      else{d.style.background='rgba(47,158,143,'+(v*0.5)+')';d.style.color=v>0.7?'#50e89a':v>0.45?'#c8d4f0':'#ffd040';}
+      // Tooltip et hover
+      var tip='r='+v.toFixed(2)+' — '+S[i].name+' / '+S[j].name;
+      if(v>0.7)tip+=' → Fortement corrélés';
+      else if(v>0.5)tip+=' → Modérément corrélés';
+      else tip+=' → Faiblement corrélés';
+      d.title=tip;
+      d.onmouseenter=function(){
+        if(i!==j){d.style.transform='scale(1.15)';d.style.filter='brightness(1.4)';d.style.zIndex='10';d.style.position='relative';}
+        // Surligner la ligne et colonne
+        cells.forEach(function(c){if(c.ri===i||c.ci===j)c.el.style.filter='brightness(1.2)';});
+      };
+      d.onmouseleave=function(){
+        d.style.transform='';d.style.filter='';d.style.zIndex='';d.style.position='';
+        cells.forEach(function(c){c.el.style.filter='';});
+      };
+      cells.push({el:d,ri:i,ci:j});
+      div.appendChild(d);
+    });
+  });
+}
+
+// ── Drawdown (statique + hover tooltip) ──────────────────────────────────────
+function buildDD(){
+  var div=document.getElementById('ddbars');
+  S.forEach(function(s){
+    var pct=Math.abs(s.dd)/25*100;
+    var row=document.createElement('div');row.className='drow';
+    row.style.cursor='default';row.style.transition='background .2s';
+    row.innerHTML='<div class="dn2" style="color:'+s.c+'">'+s.name+'</div>'
+      +'<div class="dt2"><div class="df2" id="df-'+s.id+'" style="background:linear-gradient(90deg,'+s.c+'55,#ff4060)"></div>'
+      +'<div class="dlbl2">'+s.tk+'</div></div>'
+      +'<div class="dv2">'+s.dd.toFixed(1)+'%</div>';
+    // Hover
+    row.onmouseenter=function(){
+      row.style.background='#181c30';row.style.borderRadius='6px';
+      var tip=document.getElementById('dd-tip');
+      if(!tip){tip=document.createElement('div');tip.id='dd-tip';
+        tip.style.cssText='position:fixed;background:#0b0e1c;border:1px solid #181c30;border-radius:6px;padding:8px 12px;font-size:10px;pointer-events:none;z-index:100;color:#c8d4f0;';
+        document.body.appendChild(tip);}
+      tip.innerHTML='<strong style="color:'+s.c+'">'+s.name+'</strong><br>'
+        +'Max Drawdown : <span style="color:#ff4060">'+s.dd.toFixed(1)+'%</span><br>'
+        +'Sharpe ratio : <span style="color:#ffd040">'+s.sh.toFixed(2)+'</span><br>'
+        +'Volatilité : '+s.vol.toFixed(1)+'%';
+      tip.style.display='block';
+    };
+    row.onmousemove=function(e){
+      var tip=document.getElementById('dd-tip');
+      if(tip){tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY-10)+'px';}
+    };
+    row.onmouseleave=function(){
+      row.style.background='';
+      var tip=document.getElementById('dd-tip');if(tip)tip.style.display='none';
+    };
+    div.appendChild(row);
+    setTimeout(function(){var el=document.getElementById('df-'+s.id);if(el)el.style.width=pct+'%';},400);
+  });
+}
+
+// ── Table ─────────────────────────────────────────────────────────────────────
+function buildTable(){
+  var tb=document.getElementById('tbody');
+  S.forEach(function(s){
+    var pos=s.ret>=0,sc=retColor(s.ret),sg=sigBadge(s.sh);
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td style="font-weight:700;color:'+s.c+'">'+s.tk+'</td>'
+      +'<td id="tr-ret-'+s.id+'" style="font-weight:700;color:'+sc+';font-family:Courier New,monospace">'+(pos?'+':'')+s.ret.toFixed(1)+'%</td>'
+      +'<td style="color:#3d4f70">'+s.vol.toFixed(1)+'%</td>'
+      +'<td style="color:#ffd040">'+s.sh.toFixed(2)+'</td>'
+      +'<td><span class="b '+sg[1]+'">'+sg[0]+'</span></td>';
+    tb.appendChild(tr);
+  });
+}
+
+// ── Distribution SVG ─────────────────────────────────────────────────────────
+function buildDist(){
+  var svg=document.getElementById('distchart');
+  while(svg.firstChild)svg.removeChild(svg.firstChild);
+  var W=900,H=120,pl=32,pr=12,pt=12,pb=22;
+  var cw=W-pl-pr,ch=H-pt-pb;
+
+  svg.appendChild(svgEl('rect',{x:0,y:0,width:W,height:H,fill:'#0b0e1c'}));
+
+  // Données rendements journaliers BNP
+  var s2=99;
+  function r2(){s2=s2*16807%2147483647;return(s2-1)/2147483646-.5;}
+  var daily=[];
+  for(var i=0;i<256;i++)daily.push((0.0012+r2()*0.018)*100);
+
+  var bins=40,minR=-5,maxR=5;
+  var cnts=new Array(bins).fill(0);
+  daily.forEach(function(v){
+    var b=Math.min(bins-1,Math.max(0,Math.floor((v-minR)/(maxR-minR)*bins)));
+    cnts[b]++;
+  });
+  var mxC=Math.max.apply(null,cnts)||1;
+  var mean=daily.reduce(function(a,b){return a+b;})/daily.length;
+  var std=Math.sqrt(daily.map(function(v){return(v-mean)*(v-mean);}).reduce(function(a,b){return a+b;})/daily.length)||1;
+  var bw=cw/bins;
+
+  cnts.forEach(function(cnt,i){
+    var bv=minR+(i+.5)/bins*(maxR-minR);
+    var x=pl+i*bw,bh=cnt/mxC*ch,y=pt+ch-bh;
+    var col=bv>=0?'#2fd4a0':'#ff4060';
+    var gid='dg'+i;
+    var defs2=svgEl('defs',{});
+    var lg2=svgEl('linearGradient',{id:gid,x1:'0',y1:'0',x2:'0',y2:'1'});
+    lg2.appendChild(svgEl('stop',{offset:'0%','stop-color':col,'stop-opacity':'0.85'}));
+    lg2.appendChild(svgEl('stop',{offset:'100%','stop-color':col,'stop-opacity':'0.05'}));
+    defs2.appendChild(lg2);svg.appendChild(defs2);
+    var bar=svgEl('rect',{x:x+.5,y:y,width:bw-1,height:bh,fill:'url(#'+gid+')',style:'cursor:default;transition:opacity .15s'});
+    // Hover : tooltip natif SVG + opacité
+    var ttl=document.createElementNS('http://www.w3.org/2000/svg','title');
+    ttl.textContent=(bv>=0?'+':'')+bv.toFixed(2)+'% → '+cnt+' jour'+(cnt>1?'s':'')+' | '+(cnt/daily.length*100).toFixed(1)+'% des séances';
+    bar.appendChild(ttl);
+    bar.addEventListener('mouseenter',function(){bar.style.opacity='1';bar.setAttribute('fill',col);});
+    bar.addEventListener('mouseleave',function(){bar.style.opacity='';bar.setAttribute('fill','url(#'+gid+')');});
+    svg.appendChild(bar);
+  });
+
+  // Gaussienne
+  var peak=1/(std*Math.sqrt(2*Math.PI));
+  var gpts=[];
+  for(var gi=0;gi<=200;gi++){
+    var gv=minR+gi/200*(maxR-minR);
+    var gx=pl+(gv-minR)/(maxR-minR)*cw;
+    var norm=Math.exp(-(gv-mean)*(gv-mean)/(2*std*std))/(std*Math.sqrt(2*Math.PI));
+    var gy=pt+ch*(1-norm/peak);
+    gpts.push(gx.toFixed(1)+','+gy.toFixed(1));
+  }
+  svg.appendChild(svgEl('polyline',{points:gpts.join(' '),fill:'none',stroke:'#4488ff44','stroke-width':'2'}));
+
+  // Ligne moyenne
+  var xm=pl+(mean-minR)/(maxR-minR)*cw;
+  svg.appendChild(svgEl('line',{x1:xm,y1:pt,x2:xm,y2:pt+ch,stroke:'#ffd040','stroke-width':'2','stroke-dasharray':'4,3'}));
+  var mt=svgEl('text',{x:xm+4,y:pt+11,fill:'#ffd040','font-size':'9','font-weight':'bold','font-family':'Segoe UI'});
+  mt.textContent='μ='+(mean>=0?'+':'')+mean.toFixed(3)+'%';svg.appendChild(mt);
+
+  // VaR 95%
+  var var95=mean-1.645*std;
+  var xv=pl+(var95-minR)/(maxR-minR)*cw;
+  if(xv>pl){
+    svg.appendChild(svgEl('line',{x1:xv,y1:pt,x2:xv,y2:pt+ch,stroke:'#ff4060','stroke-width':'1.5','stroke-dasharray':'3,3'}));
+    var vt=svgEl('text',{x:xv-3,y:pt+10,fill:'#ff4060','font-size':'8','text-anchor':'end','font-family':'Segoe UI'});
+    vt.textContent='VaR 95%: '+var95.toFixed(2)+'%';svg.appendChild(vt);
+  }
+
+  // X axis
+  [-4,-2,0,2,4].forEach(function(v){
+    var x=pl+(v-minR)/(maxR-minR)*cw;
+    var xt=svgEl('text',{x:x,y:H-3,fill:'#3d4f70','font-size':'9','text-anchor':'middle','font-family':'Segoe UI'});
+    xt.textContent=v+'%';svg.appendChild(xt);
+  });
+}
+
+// ── Live animation ────────────────────────────────────────────────────────────
+var slowTick=0;
+function tick(){
+  // -- Courbes + KPI (chaque tick 1.5s) --
+  S.forEach(function(s,i){
+    var last=live[i][live[i].length-1];
+    var mu=s.ret/100/252,sig=s.vol/100/Math.sqrt(252);
+    var next=last*(1+mu+(Math.random()-.48)*sig*2);
+    live[i].push(parseFloat(next.toFixed(3)));
+    if(live[i].length>400)live[i].shift();
+
+    var d=live[i],base=d[Math.max(0,d.length-PER)];
+    var ret=(d[d.length-1]/base-1)*100;
+    var sc=retColor(ret),pos=ret>=0;
+    var re=document.getElementById('r-'+s.id);
+    var pe=document.getElementById('p-'+s.id);
+    if(re){re.textContent=(pos?'+':'')+ret.toFixed(1)+'%';re.style.color=sc;}
+    if(pe){
+      var lp=s.px*(d[d.length-1]/100);
+      pe.innerHTML='€'+lp.toFixed(2)+' <span style="color:'+sc+'">'+(pos?'▲':'▼')+'</span>';
+    }
+  });
+  drawMain();
+  drawSparklines();
+
+  slowTick++;
+
+  // -- Volatilité (chaque 3 ticks ~4.5s) : légère fluctuation --
+  if(slowTick%3===0){
+    S.forEach(function(s,i){
+      liveVol[i]=s.vol*(0.95+Math.random()*0.1); // ±5%
+      var el=document.getElementById('vv-'+s.id);
+      var bar=document.getElementById('vb-'+s.id);
+      var maxH=120,maxPct=42;
+      var h=liveVol[i]/maxPct*maxH;
+      if(el)el.textContent=liveVol[i].toFixed(1)+'%';
+      if(bar)bar.style.height=h+'px';
+    });
+  }
+
+  // -- Rendements mensuels (chaque 5 ticks ~7.5s) : dernier mois mis à jour --
+  if(slowTick%5===0){
+    S.forEach(function(s,i){
+      var mu=s.ret/100/12,sig=s.vol/100/Math.sqrt(12);
+      liveMonthly[i][11]=(mu+(Math.random()-.48)*sig*1.4)*100; // dernier mois
+    });
+    buildMonthly();
+  }
+
+  // -- Synthèse : colonne rendement mise à jour comme les KPI --
+  S.forEach(function(s,i){
+    var d=live[i],base=d[Math.max(0,d.length-PER)];
+    var ret=(d[d.length-1]/base-1)*100;
+    var sc=retColor(ret),pos=ret>=0;
+    var el=document.getElementById('tr-ret-'+s.id);
+    if(el){el.textContent=(pos?'+':'')+ret.toFixed(1)+'%';el.style.color=sc;}
+  });
+}
+
+function setPer(btn,n){
+  PER=n;
+  document.querySelectorAll('.pbtn').forEach(function(b){b.classList.remove('on');});
+  btn.classList.add('on');
+  drawMain();
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+buildKPIs();
+buildLegend();
+buildMonthly();
+buildVol();
+buildCorr();
+buildDD();
+buildTable();
+buildDist();
+drawMain();
+drawSparklines();
+setInterval(tick,1500);
+</script>
+</body>
+</html>

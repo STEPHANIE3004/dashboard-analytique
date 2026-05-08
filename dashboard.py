@@ -1,284 +1,296 @@
 """
-dashboard.py - Dashboard analytique KPIs business
+dashboard.py - Dashboard analytique — Performance Bancaire CAC40
 Auteure : Vanelle Stephanie MANGOUA DJOUSSEU
 
-Genere un rapport visuel complet (8 graphiques) a partir de donnees
-synthetiques de type entreprise : ventes, produits, regions, satisfaction client.
+Donnees : Yahoo Finance API (yfinance) — cours reels sur 12 mois
+Valeurs : BNP Paribas (BNP.PA), Societe Generale (GLE.PA),
+          Credit Agricole (ACA.PA), AXA (CS.PA)
+Analyse : rendements mensuels reels, volatilite, correlations, KPIs marche
+
+Cache local : data/cac40_banques.csv — telecharge 1 fois, reutilise ensuite.
+Source      : Yahoo Finance (https://finance.yahoo.com)
 """
 
 import numpy as np
 import pandas as pd
 import matplotlib
-# matplotlib.use("Agg")  # desactive pour affichage fenetre
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from matplotlib.patches import FancyBboxPatch
 import os
+import warnings
+warnings.filterwarnings("ignore")
 
-# --------------------------------------------------------------------------
-# 1. Generation de donnees synthetiques
-# --------------------------------------------------------------------------
-
-def generer_donnees(seed=42):
-    rng = np.random.RandomState(seed)
-    mois   = ["Jan", "Fev", "Mar", "Avr", "Mai", "Jun",
-               "Jul", "Aou", "Sep", "Oct", "Nov", "Dec"]
-    trimestres = ["T1"] * 3 + ["T2"] * 3 + ["T3"] * 3 + ["T4"] * 3
-
-    produits = ["Pret Immobilier", "Compte Epargne", "Carte Premium",
-                 "Assurance Vie", "Credit Conso"]
-    regions  = ["Ile-de-France", "Auvergne-Rhone", "PACA", "Occitanie",
-                 "Bretagne", "Nouvelle-Aquitaine"]
-
-    # Serie temporelle CA mensuel
-    base_ca = 12_000_000
-    tendance = np.linspace(0, 3_000_000, 12)
-    saisonnalite = np.array([0.8, 0.85, 1.0, 0.95, 1.05, 1.1,
-                              0.9, 0.85, 1.05, 1.1, 1.15, 1.3])
-    ca_mensuel = (base_ca * saisonnalite + tendance
-                  + rng.normal(0, 400_000, 12)).astype(int)
-    ca_budget  = (base_ca * saisonnalite * 0.95 + tendance).astype(int)
-
-    # KPIs par produit
-    ca_produit = rng.dirichlet([3, 5, 2, 4, 1]) * ca_mensuel.sum()
-    nb_clients_produit = rng.randint(1500, 15000, len(produits))
-
-    # KPIs par region
-    ca_region = rng.dirichlet([5, 2, 2, 1, 1, 1]) * ca_mensuel.sum()
-    satisfaction = rng.uniform(3.8, 4.9, len(regions))
-
-    # Evolution satisfaction client (NPS)
-    nps = np.clip(rng.normal(42, 8, 12) + np.linspace(0, 15, 12), 10, 80).astype(int)
-
-    # Couts & marges
-    couts  = ca_mensuel * rng.uniform(0.55, 0.65, 12)
-    marges = ca_mensuel - couts
-
-    # Funnel de conversion
-    funnel_labels  = ["Leads", "Prospects qualifies", "Devis envoyes",
-                       "Negociation", "Clients signes"]
-    funnel_values  = [10000, 4500, 2100, 950, 420]
-
-    df_mensuel = pd.DataFrame({
-        "mois":       mois,
-        "trimestre":  trimestres,
-        "ca":         ca_mensuel,
-        "budget":     ca_budget,
-        "couts":      couts.astype(int),
-        "marge":      marges.astype(int),
-        "nps":        nps,
-    })
-    df_produit = pd.DataFrame({
-        "produit":     produits,
-        "ca":          ca_produit.astype(int),
-        "nb_clients":  nb_clients_produit,
-    })
-    df_region = pd.DataFrame({
-        "region":       regions,
-        "ca":           ca_region.astype(int),
-        "satisfaction": satisfaction.round(2),
-    })
-    return df_mensuel, df_produit, df_region, funnel_labels, funnel_values
+# Valeurs bancaires CAC40 suivies
+TICKERS = {
+    "BNP.PA":  "BNP Paribas",
+    "GLE.PA":  "Soc. Generale",
+    "ACA.PA":  "Credit Agricole",
+    "CS.PA":   "AXA",
+}
+PALETTE = ["#003f5c", "#2f9e8f", "#bc5090", "#ffa600", "#58508d", "#ff6361"]
 
 
 # --------------------------------------------------------------------------
-# 2. Calcul KPIs
+# 1. Chargement des donnees reelles (Yahoo Finance)
 # --------------------------------------------------------------------------
 
-def calculer_kpis(df_mensuel, df_produit):
-    ca_total     = df_mensuel["ca"].sum()
-    ca_budget    = df_mensuel["budget"].sum()
-    marge_tot    = df_mensuel["marge"].sum()
-    taux_marge   = marge_tot / ca_total
-    nps_moyen    = df_mensuel["nps"].mean()
-    meilleur_mois = df_mensuel.loc[df_mensuel["ca"].idxmax(), "mois"]
-    top_produit  = df_produit.loc[df_produit["ca"].idxmax(), "produit"]
-    ecart_budget = (ca_total - ca_budget) / ca_budget
+def charger_donnees_reelles(csv_cache="data/cac40_banques.csv", periode="1y"):
+    """
+    Charge les cours de cloture ajustes sur 12 mois pour 4 banques CAC40.
+    Premier lancement : telechargement Yahoo Finance (~100KB).
+    Lancements suivants : lecture directe du CSV local (pas d'internet).
+    """
+    os.makedirs("data", exist_ok=True)
 
-    print("\n[KPIs] Tableau de bord annuel")
-    print("  CA total       : {:>15,.0f} EUR".format(ca_total))
-    print("  Budget         : {:>15,.0f} EUR".format(ca_budget))
-    print("  Ecart budget   : {:>14.1%}".format(ecart_budget))
-    print("  Marge nette    : {:>14.1%}".format(taux_marge))
-    print("  NPS moyen      : {:>15.1f}".format(nps_moyen))
-    print("  Meilleur mois  : {}".format(meilleur_mois))
-    print("  Top produit    : {}".format(top_produit))
+    if os.path.exists(csv_cache):
+        print("[DATA] Lecture cache local : {}".format(csv_cache))
+        df = pd.read_csv(csv_cache, index_col=0, parse_dates=True)
+        print("[DATA] {} jours x {} valeurs chargees".format(len(df), len(df.columns)))
+        return df
+
+    try:
+        import yfinance as yf
+        print("[DATA] Telechargement Yahoo Finance — {} valeurs bancaires CAC40...".format(
+            len(TICKERS)))
+        tickers_list = list(TICKERS.keys())
+        data = yf.download(tickers_list, period=periode, interval="1d",
+                           progress=False, auto_adjust=True)
+        closes = data["Close"].dropna(how="all")
+        closes.columns = [TICKERS.get(c, c) for c in closes.columns]
+        closes.to_csv(csv_cache)
+        print("[DATA] Cours reels sauvegardes : {}".format(csv_cache))
+        print("[DATA] {} jours x {} valeurs".format(len(closes), len(closes.columns)))
+        return closes
+    except Exception as e:
+        print("[ERREUR] yfinance indisponible : {}".format(e))
+        print("[ERREUR] Installer : pip install yfinance")
+        raise
+
+
+def preparer_donnees(closes):
+    """
+    Calcule les indicateurs derives a partir des cours reels :
+    - Rendements journaliers et mensuels
+    - Volatilite annualisee
+    - Matrice de correlation
+    - KPIs synthetiques par valeur
+    """
+    # Rendements journaliers
+    returns_daily = closes.pct_change().dropna()
+
+    # Agregation mensuelle (dernier cours du mois)
+    closes_monthly = closes.resample("ME").last()
+    returns_monthly = closes_monthly.pct_change().dropna()
+
+    # Volatilite annualisee (std journalier * sqrt(252))
+    volatilite = returns_daily.std() * np.sqrt(252)
+
+    # Rendement total sur la periode
+    rendement_total = (closes.iloc[-1] / closes.iloc[0] - 1)
+
+    # Sharpe simplifie (taux sans risque ~3.5% BCE 2024)
+    rf = 0.035 / 252
+    sharpe = ((returns_daily.mean() - rf) / returns_daily.std()) * np.sqrt(252)
+
+    # Drawdown maximum
+    def max_drawdown(serie):
+        peak = serie.cummax()
+        dd = (serie - peak) / peak
+        return dd.min()
+    drawdowns = {col: max_drawdown(closes[col].dropna()) for col in closes.columns}
+
+    # Correlation
+    corr_matrix = returns_daily.corr()
 
     return {
-        "ca_total": ca_total, "ca_budget": ca_budget,
-        "taux_marge": taux_marge, "nps_moyen": nps_moyen,
-        "ecart_budget": ecart_budget, "top_produit": top_produit,
+        "closes":          closes,
+        "closes_monthly":  closes_monthly,
+        "returns_daily":   returns_daily,
+        "returns_monthly": returns_monthly,
+        "volatilite":      volatilite,
+        "rendement_total": rendement_total,
+        "sharpe":          sharpe,
+        "drawdowns":       pd.Series(drawdowns),
+        "corr_matrix":     corr_matrix,
     }
 
 
-# --------------------------------------------------------------------------
-# 3. Dashboard
-# --------------------------------------------------------------------------
+def calculer_kpis(data):
+    """Affiche les KPIs marche principaux."""
+    print("\n[KPIs] Performance Bancaire CAC40 — 12 mois")
+    print("{:<20} {:>10} {:>10} {:>10} {:>12}".format(
+        "Valeur", "Rendement", "Volatilite", "Sharpe", "Max Drawdown"))
+    print("-" * 65)
+    for col in data["closes"].columns:
+        r = data["rendement_total"].get(col, np.nan)
+        v = data["volatilite"].get(col, np.nan)
+        s = data["sharpe"].get(col, np.nan)
+        d = data["drawdowns"].get(col, np.nan)
+        print("{:<20} {:>+9.1%} {:>10.1%} {:>10.2f} {:>12.1%}".format(
+            col, r, v, s, d))
+    return data
 
-PALETTE = ["#003f5c", "#2f9e8f", "#bc5090", "#ffa600",
-            "#58508d", "#ff6361"]
+
+# --------------------------------------------------------------------------
+# 2. Dashboard
+# --------------------------------------------------------------------------
 
 def ajouter_kpi_box(ax, titre, valeur, couleur="#003f5c", sous_titre=""):
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-    ax.axis("off")
-    rect = FancyBboxPatch((0.05, 0.1), 0.9, 0.8,
-                           boxstyle="round,pad=0.02",
+    ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
+    rect = FancyBboxPatch((0.05, 0.1), 0.9, 0.8, boxstyle="round,pad=0.02",
                            facecolor=couleur, alpha=0.15,
                            edgecolor=couleur, linewidth=2)
     ax.add_patch(rect)
     ax.text(0.5, 0.72, titre, ha="center", va="center",
             fontsize=9, color="#333333", fontweight="bold")
     ax.text(0.5, 0.42, valeur, ha="center", va="center",
-            fontsize=16, color=couleur, fontweight="bold")
+            fontsize=15, color=couleur, fontweight="bold")
     if sous_titre:
         ax.text(0.5, 0.2, sous_titre, ha="center", va="center",
                 fontsize=7.5, color="#666666")
 
 
-def creer_dashboard(df_mensuel, df_produit, df_region,
-                     funnel_labels, funnel_values, kpis):
+def creer_dashboard(data):
+    closes   = data["closes"]
+    ret_m    = data["returns_monthly"]
+    ret_d    = data["returns_daily"]
+    vol      = data["volatilite"]
+    rend     = data["rendement_total"]
+    sharpe   = data["sharpe"]
+    corr     = data["corr_matrix"]
+    dd       = data["drawdowns"]
+    valeurs  = list(closes.columns)
+
     fig = plt.figure(figsize=(20, 14))
     fig.patch.set_facecolor("#f8f9fa")
-    fig.suptitle("DASHBOARD ANALYTIQUE - KPIs Business",
-                  fontsize=18, fontweight="bold", color="#003f5c", y=0.98)
+    fig.suptitle("DASHBOARD ANALYTIQUE — Performance Bancaire CAC40\n"
+                 "BNP Paribas · Soc. Generale · Credit Agricole · AXA  |  Source : Yahoo Finance",
+                 fontsize=15, fontweight="bold", color="#003f5c", y=0.98)
 
-    gs = gridspec.GridSpec(3, 4, figure=fig, hspace=0.5, wspace=0.4)
+    gs = gridspec.GridSpec(3, 4, figure=fig, hspace=0.52, wspace=0.40)
 
-    # ── Ligne 1 : KPI boxes ──────────────────────────────────────────────
-    ax_k1 = fig.add_subplot(gs[0, 0])
-    ax_k2 = fig.add_subplot(gs[0, 1])
-    ax_k3 = fig.add_subplot(gs[0, 2])
-    ax_k4 = fig.add_subplot(gs[0, 3])
+    # ── Ligne 1 : KPI boxes (rendement reel par valeur) ─────────────────
+    couleurs_kpi = ["#003f5c", "#2f9e8f", "#bc5090", "#ffa600"]
+    for i, (val, col) in enumerate(zip(valeurs, couleurs_kpi)):
+        ax = fig.add_subplot(gs[0, i])
+        r  = rend.get(val, np.nan)
+        s  = sharpe.get(val, np.nan)
+        signe = "+" if r >= 0 else ""
+        ajouter_kpi_box(ax, val,
+                         "{}{:.1%}".format(signe, r), col,
+                         "Sharpe : {:.2f} | Vol : {:.0%}".format(
+                             s, vol.get(val, np.nan)))
 
-    ajouter_kpi_box(ax_k1, "CA Annuel Total",
-                     "{:,.0f} EUR".format(kpis["ca_total"]), "#003f5c",
-                     "vs budget : {:+.1%}".format(kpis["ecart_budget"]))
-    ajouter_kpi_box(ax_k2, "Taux de Marge",
-                     "{:.1%}".format(kpis["taux_marge"]), "#2f9e8f",
-                     "Marge nette annuelle")
-    ajouter_kpi_box(ax_k3, "NPS Moyen",
-                     "{:.0f} / 100".format(kpis["nps_moyen"]), "#bc5090",
-                     "Net Promoter Score")
-    ajouter_kpi_box(ax_k4, "Top Produit",
-                     kpis["top_produit"].replace(" ", "\n"), "#ffa600",
-                     "Meilleure contribution CA")
-
-    # ── Ligne 2 : CA mensuel + CA vs budget ─────────────────────────────
+    # ── Ligne 2a : Cours normalises (base 100) ──────────────────────────
     ax2a = fig.add_subplot(gs[1, 0:2])
-    x    = np.arange(len(df_mensuel))
-    bars = ax2a.bar(x, df_mensuel["ca"] / 1e6, color=PALETTE[0], alpha=0.8,
-                     label="CA reel")
-    ax2a.plot(x, df_mensuel["budget"] / 1e6, "o--", color="#ffa600",
-               linewidth=2, label="Budget", zorder=5)
-    ax2a.set_xticks(x)
-    ax2a.set_xticklabels(df_mensuel["mois"], fontsize=8)
-    ax2a.set_ylabel("CA (M EUR)")
-    ax2a.set_title("CA Mensuel vs Budget", fontweight="bold")
+    closes_norm = closes / closes.iloc[0] * 100
+    for i, col in enumerate(valeurs):
+        ax2a.plot(closes_norm.index, closes_norm[col],
+                   label=col, color=PALETTE[i], linewidth=1.8)
+    ax2a.axhline(100, color="gray", linestyle="--", alpha=0.4, linewidth=1)
+    ax2a.set_title("Cours normalises base 100 — 12 mois (Yahoo Finance)", fontweight="bold")
+    ax2a.set_ylabel("Valeur relative")
     ax2a.legend(fontsize=8)
-    ax2a.grid(axis="y", alpha=0.3)
+    ax2a.grid(alpha=0.25)
     ax2a.set_facecolor("#fdfdfd")
+    ax2a.tick_params(axis="x", rotation=20, labelsize=7)
 
-    # ── Ligne 2 : Repartition CA par produit ────────────────────────────
+    # ── Ligne 2b : Rendements mensuels barres groupees ───────────────────
     ax2b = fig.add_subplot(gs[1, 2])
-    wedges, texts, autotexts = ax2b.pie(
-        df_produit["ca"],
-        labels=None,
-        autopct="%1.1f%%",
-        colors=PALETTE,
-        startangle=140,
-        pctdistance=0.75,
-    )
-    for at in autotexts:
-        at.set_fontsize(7.5)
-    ax2b.legend(df_produit["produit"], loc="lower left",
-                 fontsize=6.5, bbox_to_anchor=(-0.3, -0.15))
-    ax2b.set_title("Part de CA par Produit", fontweight="bold")
+    x = np.arange(len(ret_m))
+    w = 0.2
+    for i, col in enumerate(valeurs):
+        vals = ret_m[col].values if col in ret_m.columns else np.zeros(len(x))
+        colors_bar = ["#2f9e8f" if v >= 0 else "#d62728" for v in vals]
+        ax2b.bar(x + i * w, vals * 100, w, color=colors_bar, alpha=0.8, label=col)
+    ax2b.axhline(0, color="black", linewidth=0.8)
+    ax2b.set_title("Rendements mensuels (%)", fontweight="bold")
+    ax2b.set_ylabel("%")
+    ax2b.legend(fontsize=6.5)
+    ax2b.grid(axis="y", alpha=0.3)
+    ax2b.set_facecolor("#fdfdfd")
+    mois_labels = [str(d)[:7] for d in ret_m.index]
+    ax2b.set_xticks(x + w * 1.5)
+    ax2b.set_xticklabels(mois_labels, rotation=45, fontsize=6)
 
-    # ── Ligne 2 : Evolution NPS ─────────────────────────────────────────
+    # ── Ligne 2c : Volatilite annualisee ────────────────────────────────
     ax2c = fig.add_subplot(gs[1, 3])
-    ax2c.fill_between(df_mensuel["mois"], df_mensuel["nps"],
-                       alpha=0.3, color="#bc5090")
-    ax2c.plot(df_mensuel["mois"], df_mensuel["nps"],
-               "o-", color="#bc5090", linewidth=2)
-    ax2c.axhline(50, color="gray", linestyle="--", alpha=0.5, label="NPS cible=50")
-    ax2c.set_ylabel("NPS")
-    ax2c.set_title("Evolution NPS", fontweight="bold")
-    ax2c.tick_params(axis="x", rotation=45, labelsize=7)
-    ax2c.legend(fontsize=7)
-    ax2c.grid(alpha=0.3)
+    vol_vals = [vol.get(v, 0) * 100 for v in valeurs]
+    bars = ax2c.bar(valeurs, vol_vals,
+                     color=[PALETTE[i] for i in range(len(valeurs))], alpha=0.85)
+    for bar, v in zip(bars, vol_vals):
+        ax2c.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.3,
+                   "{:.1f}%".format(v), ha="center", fontsize=8, fontweight="bold")
+    ax2c.set_title("Volatilite annualisee (%)", fontweight="bold")
+    ax2c.set_ylabel("Volatilite (%)")
+    ax2c.tick_params(axis="x", rotation=15, labelsize=8)
+    ax2c.grid(axis="y", alpha=0.3)
     ax2c.set_facecolor("#fdfdfd")
 
-    # ── Ligne 3 : Marge mensuelle ────────────────────────────────────────
+    # ── Ligne 3a : Matrice de correlation ───────────────────────────────
     ax3a = fig.add_subplot(gs[2, 0:2])
-    ax3a.bar(df_mensuel["mois"], df_mensuel["marge"] / 1e6,
-              color="#2f9e8f", alpha=0.8, label="Marge")
-    ax3a.plot(df_mensuel["mois"], df_mensuel["ca"] / 1e6,
-               "s--", color=PALETTE[0], linewidth=1.5, label="CA")
-    ax3a.set_ylabel("M EUR")
-    ax3a.set_title("Marge & CA mensuel", fontweight="bold")
-    ax3a.legend(fontsize=8)
-    ax3a.tick_params(axis="x", rotation=30, labelsize=8)
-    ax3a.grid(axis="y", alpha=0.3)
-    ax3a.set_facecolor("#fdfdfd")
+    im = ax3a.imshow(corr.values, cmap="RdYlGn", vmin=-1, vmax=1, aspect="auto")
+    ax3a.set_xticks(range(len(valeurs)))
+    ax3a.set_yticks(range(len(valeurs)))
+    ax3a.set_xticklabels(valeurs, rotation=20, fontsize=8)
+    ax3a.set_yticklabels(valeurs, fontsize=8)
+    for i in range(len(valeurs)):
+        for j in range(len(valeurs)):
+            ax3a.text(j, i, "{:.2f}".format(corr.values[i, j]),
+                       ha="center", va="center", fontsize=9, fontweight="bold",
+                       color="black")
+    fig.colorbar(im, ax=ax3a, fraction=0.046, pad=0.04)
+    ax3a.set_title("Matrice de correlation des rendements journaliers", fontweight="bold")
 
-    # ── Ligne 3 : Funnel de conversion ──────────────────────────────────
+    # ── Ligne 3b : Distribution rendements journaliers BNP ──────────────
     ax3b = fig.add_subplot(gs[2, 2])
-    y_pos = np.arange(len(funnel_labels))
-    colors_funnel = ["#003f5c", "#2f4b7c", "#665191",
-                      "#a05195", "#d45087"]
-    bars3 = ax3b.barh(y_pos, funnel_values, color=colors_funnel, height=0.6)
-    ax3b.set_yticks(y_pos)
-    ax3b.set_yticklabels(funnel_labels, fontsize=8)
-    ax3b.set_xlabel("Nombre")
-    ax3b.set_title("Funnel de Conversion", fontweight="bold")
-    for bar, val in zip(bars3, funnel_values):
-        ax3b.text(bar.get_width() + 100, bar.get_y() + bar.get_height() / 2,
-                   "{:,}".format(val), va="center", fontsize=8)
-    ax3b.grid(axis="x", alpha=0.3)
+    col0 = valeurs[0]
+    rd   = ret_d[col0].dropna() * 100
+    ax3b.hist(rd, bins=40, color=PALETTE[0], alpha=0.75, edgecolor="white", linewidth=0.3)
+    ax3b.axvline(rd.mean(), color="red", linestyle="--", linewidth=1.5,
+                  label="Moyenne : {:.2f}%".format(rd.mean()))
+    ax3b.axvline(0, color="black", linewidth=0.8, alpha=0.5)
+    ax3b.set_xlabel("Rendement journalier (%)")
+    ax3b.set_ylabel("Frequence")
+    ax3b.set_title("Distribution rendements — {}".format(col0), fontweight="bold")
+    ax3b.legend(fontsize=8)
+    ax3b.grid(alpha=0.3)
     ax3b.set_facecolor("#fdfdfd")
 
-    # ── Ligne 3 : CA et satisfaction par region ──────────────────────────
+    # ── Ligne 3c : Max Drawdown ──────────────────────────────────────────
     ax3c = fig.add_subplot(gs[2, 3])
-    sc = ax3c.scatter(
-        df_region["ca"] / 1e6,
-        df_region["satisfaction"],
-        s=200,
-        c=range(len(df_region)),
-        cmap="viridis",
-        zorder=5,
-    )
-    for _, row in df_region.iterrows():
-        ax3c.annotate(row["region"].split("-")[0],
-                       (row["ca"] / 1e6, row["satisfaction"]),
-                       fontsize=6.5, xytext=(4, 4),
-                       textcoords="offset points")
-    ax3c.set_xlabel("CA (M EUR)")
-    ax3c.set_ylabel("Satisfaction client")
-    ax3c.set_title("CA vs Satisfaction (region)", fontweight="bold")
-    ax3c.grid(alpha=0.3)
+    dd_vals = [dd.get(v, 0) * 100 for v in valeurs]
+    bars3 = ax3c.barh(valeurs, dd_vals,
+                       color=["#d62728" if v < 0 else "#2f9e8f" for v in dd_vals],
+                       alpha=0.85)
+    for bar, v in zip(bars3, dd_vals):
+        ax3c.text(bar.get_width() - 0.5, bar.get_y() + bar.get_height() / 2,
+                   "{:.1f}%".format(v), va="center", ha="right",
+                   fontsize=9, fontweight="bold", color="white")
+    ax3c.axvline(0, color="black", linewidth=0.8)
+    ax3c.set_xlabel("Drawdown (%)")
+    ax3c.set_title("Maximum Drawdown — 12 mois", fontweight="bold")
+    ax3c.grid(axis="x", alpha=0.3)
     ax3c.set_facecolor("#fdfdfd")
 
     out = "dashboard_kpis.png"
-    plt.savefig(out, dpi=150, bbox_inches="tight",
-                 facecolor=fig.get_facecolor())
+    plt.savefig(out, dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
     print("[VIZ] Dashboard sauvegarde : {}".format(out))
     return out
 
 
 # --------------------------------------------------------------------------
-# 4. Export rapport CSV
+# 3. Export CSV
 # --------------------------------------------------------------------------
 
-def exporter_rapport(df_mensuel, df_produit, df_region, kpis):
+def exporter_rapport(data):
     os.makedirs("data", exist_ok=True)
-    df_mensuel.to_csv("data/kpis_mensuel.csv", index=False)
-    df_produit.to_csv("data/kpis_produit.csv", index=False)
-    df_region.to_csv("data/kpis_region.csv",  index=False)
-    with open("data/synthese_kpis.json", "w") as f:
-        import json
-        json.dump({k: str(v) for k, v in kpis.items()}, f, indent=2)
-    print("[EXPORT] Rapports CSV/JSON sauvegardes dans data/")
+    data["closes"].to_csv("data/cours_cac40_banques.csv")
+    data["returns_monthly"].to_csv("data/rendements_mensuels.csv")
+    data["volatilite"].to_frame("volatilite_annualisee").to_csv("data/volatilite.csv")
+    data["corr_matrix"].to_csv("data/correlation_matrix.csv")
+    print("[EXPORT] CSV sauvegardes dans data/")
 
 
 # --------------------------------------------------------------------------
@@ -286,21 +298,23 @@ def exporter_rapport(df_mensuel, df_produit, df_region, kpis):
 # --------------------------------------------------------------------------
 
 def main():
-    print("=" * 60)
-    print("   DASHBOARD ANALYTIQUE - KPIs Business")
-    print("=" * 60)
+    print("=" * 65)
+    print("   DASHBOARD ANALYTIQUE — Performance Bancaire CAC40")
+    print("   Source : Yahoo Finance (cours reels 12 mois)")
+    print("=" * 65)
 
-    df_mensuel, df_produit, df_region, fl, fv = generer_donnees()
-    kpis = calculer_kpis(df_mensuel, df_produit)
-    creer_dashboard(df_mensuel, df_produit, df_region, fl, fv, kpis)
-    exporter_rapport(df_mensuel, df_produit, df_region, kpis)
+    closes = charger_donnees_reelles()
+    data   = preparer_donnees(closes)
+    calculer_kpis(data)
+    creer_dashboard(data)
+    exporter_rapport(data)
 
     print("\n[DONE] Fichiers generes :")
-    print("  - dashboard_kpis.png")
-    print("  - data/kpis_mensuel.csv")
-    print("  - data/kpis_produit.csv")
-    print("  - data/kpis_region.csv")
-    print("  - data/synthese_kpis.json")
+    print("  - dashboard_kpis.png          (8 graphiques — donnees reelles)")
+    print("  - data/cac40_banques.csv      (cours bruts Yahoo Finance)")
+    print("  - data/rendements_mensuels.csv")
+    print("  - data/volatilite.csv")
+    print("  - data/correlation_matrix.csv")
 
 
 if __name__ == "__main__":

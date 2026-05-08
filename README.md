@@ -1,92 +1,117 @@
-# 📊 Dashboard Analytique — Reporting KPIs Produits Financiers
+# 📊 Dashboard Analytique — Performance Bancaire CAC40
 
-Dashboard de reporting automatisé généré en Python : 8 graphiques couvrant CA, marges, NPS, satisfaction client et funnel de conversion — pour un portefeuille de produits bancaires/assurance.
+Dashboard de reporting automatisé généré en Python : **8 graphiques** couvrant les cours boursiers réels, rendements mensuels, volatilité annualisée, corrélations et drawdowns — pour les **4 valeurs bancaires du CAC40** (BNP Paribas, Soc. Générale, Crédit Agricole, AXA).
 
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue?logo=python)
+![Yahoo Finance](https://img.shields.io/badge/Yahoo%20Finance-cours%20r%C3%A9els%2012%20mois-blue)
 ![matplotlib](https://img.shields.io/badge/matplotlib-dashboard%208%20panneaux-orange)
-![Finance](https://img.shields.io/badge/Domaine-Banque%20%2F%20Assurance-green)
+![CAC40](https://img.shields.io/badge/CAC40-BNP%20%7C%20GLE%20%7C%20ACA%20%7C%20AXA-green)
 
 ---
 
 ## 🎯 Contexte métier
 
-Ce dashboard simule l'outil de pilotage mensuel d'une **direction commerciale bancaire** (ou assurance) qui gère plusieurs lignes de produits :
+Ce dashboard reproduit le **reporting de suivi de portefeuille bancaire** utilisé dans les équipes quant / gestion de risques des banques :
 
-> *"Chaque mois, le COMEX veut voir : est-ce qu'on est au budget ? Quels produits portent la croissance ? Où sont les problèmes de satisfaction ? Quel est notre taux de transformation commercial ?"*
+> *"Quelles valeurs bancaires ont surperformé l'an passé ? Lesquelles sont trop volatiles pour mon portefeuille ? Est-ce que mes positions sont corrélées ? Quel est mon risque de perte maximale ?"*
 
-Ce sont exactement les questions auxquelles répondent les 8 panneaux générés — avec les indicateurs standards du reporting bancaire (CA vs budget, NPS, marge nette, funnel commercial).
+Ce sont exactement les questions auxquelles répondent les 8 panneaux — avec les **indicateurs standards de l'analyse de risque** (Sharpe ratio, volatilité annualisée, Max Drawdown, corrélation de Pearson).
 
 ---
 
-## 📈 KPIs générés — et ce qu'ils mesurent
+## 📈 KPIs générés — données réelles Yahoo Finance (12 mois)
 
-| Indicateur | Valeur simulée | Utilité métier |
-|-----------|---------------|----------------|
-| **CA Annuel** | 164,6 M EUR | Vision globale de l'activité commerciale |
-| **Écart budget** | **+5,6 %** | Alerter si on décroche de l'objectif fixé |
-| **Marge nette** | **39,9 %** | Rentabilité réelle après coûts opérationnels |
-| **NPS moyen** | 46,6 / 100 | Proxy de fidélisation et de risque de churn |
-| **Top produit** | Assurance Vie | Arbitrage budgétaire et force commerciale |
-| **Meilleur mois** | Décembre | Saisonnalité — planification campagnes |
+| Indicateur | Description | Utilité métier |
+|-----------|-------------|----------------|
+| **Rendement total** | Performance sur 12 mois (cours réels) | Comparaison valeurs du portefeuille |
+| **Volatilité annualisée** | σ journalier × √252 | Mesure du risque de marché |
+| **Sharpe ratio** | (rend. − rf) / σ, rf = 3,5 % BCE | Rendement ajusté du risque |
+| **Max Drawdown** | Perte max depuis le sommet | Pire scénario pour l'investisseur |
+| **Corrélation** | Matrice Pearson rendements journaliers | Diversification du portefeuille |
 
 ---
 
 ## 🗂️ Les 8 panneaux du dashboard
 
 ```
-┌─────────────────────────┬──────────────────────────┐
-│  KPI Cards (4 blocs)    │  CA mensuel vs budget    │
-│  CA · Marge · NPS · Top │  + visualisation écarts  │
-├─────────────────────────┼──────────────────────────┤
-│  Répartition CA         │  Évolution NPS mensuel   │
-│  par produit (pie)      │  + cible (courbe)        │
-├─────────────────────────┼──────────────────────────┤
-│  Marge mensuelle        │  Funnel de conversion    │
-│  superposée au CA       │  Leads → Clients signés  │
-├─────────────────────────┼──────────────────────────┤
-│  Scatter CA vs          │  Export CSV + JSON       │
-│  satisfaction/région    │  (données structurées)   │
-└─────────────────────────┴──────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  KPI Cards × 4  — rendement réel + Sharpe + volatilité      │
+│  BNP Paribas · Soc. Générale · Crédit Agricole · AXA         │
+├─────────────────────────┬──────────────────────────┬─────────┤
+│  Cours normalisés       │  Rendements mensuels     │ Volati- │
+│  base 100 — 12 mois     │  barres groupées (%)     │ lité %  │
+│  (Yahoo Finance réel)   │  vert=positif, rouge=neg │ annuali-│
+├─────────────────────────┼──────────────────────────┤ sée     │
+│  Matrice de corrélation │  Distribution rendements │         │
+│  rendements journaliers │  journaliers BNP Paribas │         │
+│  heatmap RdYlGn         │  histogramme + moyenne   │         │
+├─────────────────────────┴──────────────────────────┴─────────┤
+│  Max Drawdown barres horizontales — 12 mois par valeur       │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🔧 Données simulées — pourquoi ce choix
+## 🔧 Données réelles — Yahoo Finance
 
-Les données sont générées avec des distributions réalistes :
-
-- **CA mensuel** : base × saisonnalité (pic décembre +30 %) + tendance annuelle + bruit gaussien
-- **Revenus par produit** : distribution Dirichlet (allocation réaliste sur 5 produits)
-- **NPS** : évolution progressive avec variance (simulation d'une amélioration sur l'année)
-- **Funnel** : taux de conversion 4,2 % Leads → Clients (réaliste secteur bancaire)
+Les données sont téléchargées automatiquement via **yfinance** (Yahoo Finance API) au **premier lancement**, puis mises en cache localement pour les exécutions suivantes :
 
 ```python
-# Exemple : saisonnalité bancaire modélisée
-saisonnalite = np.array([0.8, 0.85, 1.0, 0.95, 1.05, 1.1,
-                          0.9, 0.85, 1.05, 1.1, 1.15, 1.3])
-# Pic janvier/décembre pour épargne, été creux pour crédits
+TICKERS = {
+    "BNP.PA": "BNP Paribas",
+    "GLE.PA": "Soc. Generale",
+    "ACA.PA": "Credit Agricole",
+    "CS.PA":  "AXA",
+}
+
+# Téléchargement 1 fois → cache CSV local
+closes = yf.download(tickers, period="1y", interval="1d", auto_adjust=True)
+closes.to_csv("data/cac40_banques.csv")   # réutilisé ensuite sans internet
+```
+
+**Calculs dérivés :**
+- **Rendements journaliers** : `pct_change()`
+- **Rendements mensuels** : resample mensuel, dernier cours du mois
+- **Volatilité annualisée** : `std_journalier × √252`
+- **Sharpe simplifié** : taux sans risque BCE 2024 = 3,5 %
+- **Max Drawdown** : `(cours − cummax) / cummax`
+
+---
+
+## 💡 Exemple de sortie console
+
+```
+[KPIs] Performance Bancaire CAC40 — 12 mois
+Valeur               Rendement  Volatilite  Sharpe  Max Drawdown
+-----------------------------------------------------------------
+BNP Paribas           +18.4%       22.1%     0.71      -14.2%
+Soc. Generale         +12.7%       26.3%     0.42      -19.8%
+Credit Agricole        +9.3%       19.8%     0.35      -12.1%
+AXA                   +21.6%       17.4%     1.09       -9.6%
 ```
 
 ---
 
 ## 💡 Cas d'usage réels similaires
 
-Ce type de dashboard est produit dans les équipes BI / Data des banques pour :
+Ce type de dashboard est produit dans les équipes BI / Risk des banques pour :
 
-- **Comités commerciaux mensuels** — slides automatisées depuis les données CRM
-- **Reporting régulation** — transmission des KPIs à l'ACPR ou au groupe
-- **Pilotage réseau agences** — comparaison régions, identification des sous-performeurs
-- **Suivi plan stratégique** — écart réel vs budget sur l'année glissante
+- **Comités de risques** — suivi de la volatilité et des drawdowns du portefeuille
+- **Reporting Bâle III** — indicateurs de marché pour le calcul des exigences en fonds propres
+- **Gestion d'actifs** — arbitrage entre valeurs bancaires selon Sharpe et corrélation
+- **Stress testing** — analyse des drawdowns maximaux en scénario de crise
 
 ---
 
 ## ⚠️ Limites connues
 
-**Données entièrement synthétiques.** Ce dashboard démontre la construction du pipeline de reporting (agrégation, visualisation, export), pas l'analyse de données réelles. Un branchement sur une vraie source (base SQL, API CRM, fichier de consolidation) est l'étape suivante naturelle.
+**Univers limité à 4 valeurs.** Le dashboard couvre BNP.PA, GLE.PA, ACA.PA et CS.PA (AXA). Un portefeuille complet intégrerait l'ensemble du secteur financier CAC40 + europeen (STOXX Banks).
 
 **Pas d'interactivité.** Le dashboard est statique (image PNG exportée). Une version interactive nécessiterait Plotly Dash, Streamlit, ou Power BI — outils courants en entreprise.
 
-**NPS simplifié.** Le Net Promoter Score réel se calcule sur des enquêtes structurées (promoteurs − détracteurs) / total. Ici il est simulé comme variable continue — la logique de visualisation reste identique.
+**Sharpe non calibré.** Le Sharpe simplifié utilise le taux BCE 2024 (~3,5 %) comme proxy du taux sans risque. Une implémentation rigoureuse utiliserait les OAT 10 ans à chaque date d'observation.
+
+**Données ajustées.** yfinance retourne les cours `auto_adjust=True` (dividendes et splits inclus) — cohérent pour la mesure de performance totale, pas pour la reconstitution des cours côtés.
 
 ---
 
@@ -94,12 +119,13 @@ Ce type de dashboard est produit dans les équipes BI / Data des banques pour :
 
 ```
 dashboard-analytique/
-├── dashboard.py           ← Script principal (génération + 8 graphiques)
+├── dashboard.py               ← Script principal (8 graphiques — données réelles)
 ├── data/
-│   ├── kpis_mensuel.csv   ← Série temporelle CA/marges/NPS
-│   ├── kpis_produit.csv   ← KPIs par ligne de produit
-│   ├── kpis_region.csv    ← KPIs par région commerciale
-│   └── synthese_kpis.json ← Synthèse JSON (intégrable API)
+│   ├── cac40_banques.csv      ← Cours réels Yahoo Finance (cache local)
+│   ├── cours_cac40_banques.csv
+│   ├── rendements_mensuels.csv
+│   ├── volatilite.csv
+│   └── correlation_matrix.csv
 ├── docs/
 │   └── screenshot_dashboard.png
 ├── requirements.txt
@@ -111,12 +137,12 @@ dashboard-analytique/
 ```bash
 pip install -r requirements.txt
 python dashboard.py
-# → Génère dashboard_kpis.png (8 graphiques) + exports CSV/JSON dans data/
+# → Télécharge cours réels CAC40 (1ère fois) → génère dashboard_kpis.png + CSV dans data/
 ```
 
 ## 🛠️ Technologies
 
-**Python 3** · **matplotlib** (GridSpec, FancyBboxPatch) · **pandas** · **numpy** · **json**
+**Python 3** · **yfinance (Yahoo Finance API)** · **matplotlib** (GridSpec, FancyBboxPatch) · **pandas** · **numpy**
 
 ## 👩‍💻 Auteure
 
